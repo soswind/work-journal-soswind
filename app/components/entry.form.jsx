@@ -1,13 +1,16 @@
 import { useFetcher } from "@remix-run/react";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { format } from "date-fns";
+
+
 
 export default function EntryForm({ entry }) {
     const fetcher = useFetcher();
     const textareaRef = useRef(null);
-
     const isIdle = fetcher.state === "idle";
     const isInit = isIdle && fetcher.data == null;
+
+    const [image, setImage] = useState(entry?.image ? entry?.image : null);
 
     useEffect(() => {
         if (!isInit && isIdle && textareaRef.current) {
@@ -16,9 +19,23 @@ export default function EntryForm({ entry }) {
         }
     }, [isInit, isIdle]);
 
+    function handleImageChange(event) {
+        const file = event.target.files[0];
+        if (file.size < 5000000) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setImage(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            alert("Billedet er for stort. Max 5MB.");
+            event.target.value = "";
+        }
+    }
+
     return (
 
-        <fetcher.Form method="post" className="mt-4">
+        <fetcher.Form method="post" className="mt-4" encType="multipart/form-data">
         <fieldset
           className="disabled:opacity-70"
           disabled={fetcher.state !== "idle"}
@@ -43,7 +60,7 @@ export default function EntryForm({ entry }) {
                 { label: "Læring", value: "learning" },
                 { label: "Interessante ting", value: "interesting-thing" },
               ].map((option) => (
-                <label key={option.value} className="inline-block text-white">
+                <label key={option.value} className="inline-block text-white hover:cursor-pointer">
                   <input
                     required
                     type="radio"
@@ -59,6 +76,21 @@ export default function EntryForm({ entry }) {
             </div>
           </div>
           <div className="mt-6">
+            <label className="block mb-2 text-white" htmlFor="file_input">
+                Image
+            </label>
+            <input 
+            className="block w-full text-sm text-gray-900 border border-gray-300
+            rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none
+            dark_bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+            name="image"
+            type="file"
+            onChange={handleImageChange}
+            />
+            {image && <img src={image} alt="" className="mt-2 rounded-lg"/>}
+            </div>
+
+            <div className="mt-6">
             <textarea
               ref={textareaRef}
               placeholder="Skriv dit input..."

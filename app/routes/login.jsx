@@ -1,5 +1,5 @@
 import { Form, useLoaderData, useActionData } from "@remix-run/react";
-import { getSession, commitSession } from "./session.server";
+import { getSession, commitSession } from "../session.server";
 import { json, redirect } from "@remix-run/node";
 
 export async function loader({ request }) {

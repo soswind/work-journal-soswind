@@ -2,28 +2,10 @@ import { Link, useLoaderData } from "@remix-run/react";
 import { format, startOfWeek, parseISO } from "date-fns";
 import mongoose from "mongoose";
 import EntryForm from "../components/entry.form";
-import { getSession } from "./session.server";
-/* ACTION --------------------------------------------------------- */
-export async function action({ request }) {
-  const session = await getSession(request.headers.get("cookie"));
-  if (!session.data.isAdmin) {
-    throw new Response("Not authenticated", {
-      status: 401,
-      statusText: "Not authenticated",
-    });
-  }
-  let formData = await request.formData();
-  // Artificially slow down the form submission to show pending UI
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  // Mongoose will throw an error if the entry data is invalid (and we don't
-  // catch it here, so it will be caught by Remix's error boundary and displayed
-  // to the user — we can improve on that later)
-  return mongoose.models.Entry.create({
-    date: new Date(formData.get("date")),
-    type: formData.get("type"),
-    text: formData.get("text"),
-  });
-}
+import { getSession } from "../session.server";
+import { uploadImage } from "../upload-handler.server";
+
+
 /* LOADER --------------------------------------------------------- */
 export async function loader({ request }) {
   let session = await getSession(request.headers.get("cookie"));
@@ -48,12 +30,16 @@ export async function loader({ request }) {
 /* UI ------------------------------------------------------------- */
 export default function Index() {
   const { session, entries } = useLoaderData();
+
   const entriesByWeek = entries.reduce((memo, entry) => {
     let sunday = startOfWeek(parseISO(entry.date));
     let sundayString = format(sunday, "yyyy-MM-dd");
+
     memo[sundayString] ||= [];
     memo[sundayString].push(entry);
+
     return memo;
+
   }, {});
 
   const weeks = Object.keys(entriesByWeek).map((dateString) => ({
@@ -127,6 +113,13 @@ function EntryListItem({ entry }) {
   return (
     <li className="group leading-7">
       {entry.text}
+      {entry.image && (
+        <img 
+        src={entry.image}
+        alt={entry.text}
+        className="max-w-xs mt-2 rounded-lg"
+        />
+      )}
 
       {session.isAdmin && (
         <Link
@@ -138,4 +131,60 @@ function EntryListItem({ entry }) {
       )}
     </li>
   );
+}
+
+
+
+/* ACTION --------------------------------------------------------- */
+export async function action({ request }) {
+
+
+  const session = await getSession(request.headers.get("cookie"));
+  if (!session.data.isAdmin) {
+    throw new Response("Not authenticated", {
+      status: 401,
+      statusText: "Not authenticated",
+    });
+  }
+
+  const formData = await request.formData();
+
+  const { date, type, text, image } = Object.fromEntries(formData);
+
+  if (
+    typeof date !== "string" ||
+    typeof type !== "string" ||
+    typeof text !== "string" ||
+    !image
+  ) {
+    throw new Error("Bad request");
+  }
+
+  if (image instanceof File) {
+    const imageURL = await uploadImage(image);
+
+    const entry = new mongoose.models.Entry({
+      date: new Date(date),
+      type,
+      text,
+      image: imageURL,
+    });
+
+    await entry.save();
+  } else {
+    throw new Error("Image file is missing or invalid");
+  }
+
+  // Artificially slow down the form submission to show pending UI
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Mongoose will throw an error if the entry data is invalid (and we don't
+  // catch it here, so it will be caught by Remix's error boundary and displayed
+  // to the user — we can improve on that later)
+  return mongoose.models.Entry.create({
+    date: new Date(formData.get("date")),
+    type: formData.get("type"),
+    text: formData.get("text"),
+  });
+  
+
 }

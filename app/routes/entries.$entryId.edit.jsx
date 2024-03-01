@@ -2,7 +2,9 @@ import { useLoaderData, Form } from "@remix-run/react";
 import mongoose from "mongoose";
 import EntryForm from "../components/entry.form";
 import { redirect } from "@remix-run/node";
-import { getSession } from "./session.server";
+import { getSession } from "../session.server";
+import { uploadImage } from "../upload-handler.server";
+
 
 export async function loader({ params, request }) {
     if (typeof params.entryId !== "string") {
@@ -10,7 +12,7 @@ export async function loader({ params, request }) {
     });
     }
 
-    let entry = await 
+    const entry = await 
 mongoose.models.Entry.findById(params.entryId)
 .lean()
 .exec();
@@ -46,11 +48,10 @@ export async function action({ request, params }) {
     });
     }
 
-    let formData = await request.formData();
+    const formData = await request.formData();
+    const { _action, date, type, text, image } = Object.fromEntries(formData);
     // Artificially slow down the form submission to show pending UI
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    if (formData.get("_action") === "delete") {
+    if (_action === "delete") {
 
         await 
 
@@ -58,12 +59,27 @@ export async function action({ request, params }) {
 
         return redirect("/");
     } else {
+        if (
+            typeof date !== "string" ||
+            typeof type !== "string" ||
+            typeof text !== "string" ||
+            !image
+
+        ) {
+            throw new Error("Bad request");
+        }
+
         const entry = await 
         mongoose.models.Entry.findById(params.entryId);
 
         entry.date = new Date(formData.get("date"));
         entry.type = formData.get("type");
         entry.text = formData.get("text");
+
+        if (image instanceof File) {
+            const imageURL = await uploadImage(image);
+            entry.image = imageURL;
+        }
 
         await entry.save();
 

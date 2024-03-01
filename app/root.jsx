@@ -11,7 +11,7 @@ import {
   useRouteError,
   isRouteErrorResponse,
 } from "@remix-run/react";
-import { destroySession, getSession } from "./routes/session.server";
+import { destroySession, getSession } from "./session.server";
 import { redirect } from "@remix-run/node";
 import stylesheet from "./tailwind.css";
 
